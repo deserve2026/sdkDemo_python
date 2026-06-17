@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>SapphireView · 蓝衡声呐模拟</title>
+    <style>
+        /* ========== 全局样式 ========== */
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI','Roboto','Inter','Microsoft YaHei',sans-serif; }
+        body {
+            background:#0b111f;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            width:100vw;
+            height:100vh;
+            overflow:hidden;
+            margin:0;
+        }
+        .app {
+            width:968px;
+            height:820px;
+            background:#0d1a2b;
+            border-radius:24px;
+            box-shadow:0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(60,120,200,0.15);
+            display:flex;
+            flex-direction:column;
+            padding:6px 20px 10px 20px;
+            overflow:hidden;
+            transform-origin: top left;
+            position:absolute;
+        }
+
+        /* ========== 顶部栏：紧凑，仅右侧窗口控制 ========== */
+        .top-bar {
+            display:flex;
+            justify-content:flex-end;
+            align-items:center;
+            height:32px;
+            flex-shrink:0;
+            margin-bottom:4px;
+        }
+        .win-controls {
+            display:flex;
+            gap:6px;
+            align-items:center;
+        }
+        .win-btn {
+            width:26px;
+            height:26px;
+            border-radius:50%;
+            border:none;
+            color:#e0f0ff;
+            background:#1a2d44;
+            font-size:14px;
+            line-height:1;
+            cursor:pointer;
+            transition:0.2s;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:0;
+        }
+        .win-btn:hover { background:#2a4060; }
+        .win-btn.close { background:#c42b2b; }
+        .win-btn.close:hover { background:#e03a3a; }
+        .win-btn.max { background:#1a6b3a; }
+        .win-btn.max:hover { background:#2a8a4a; }
+
+        /* ========== 图像容器 ========== */
+        .canvas-wrapper {
+            flex:1;
+            background:#06122c;
+            border-radius:16px;
+            overflow:hidden;
+            box-shadow:inset 0 0 50px rgba(0,20,60,0.8), 0 4px 20px rgba(0,0,0,0.5);
+            position:relative;
+            min-height:0;
+            border:1px solid #1a3a5a;
+        }
+        #sonarCanvas {
+            width:100%;
+            height:100%;
+            display:block;
+            background:#06122c;
+        }
+
+        /* ========== 按钮行 + Logo（铺满整行） ========== */
+        .overlay-top {
+            position:absolute;
+            top:12px;
+            left:14px;
+            right:14px;
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+            z-index:20;
+        }
+        .controls-row {
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+        }
+        .btn-group {
+            display:flex;
+            gap:7px;
+            flex-wrap:wrap;
+            align-items:center;
+        }
+        .btn-group .c-btn {
+            background:#1a2d44cc;
+            backdrop-filter:blur(4px);
+            border:1px solid #2a4a6a;
+            padding:4px 12px;
+            font-size:12px;
+            height:29px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.5);
+        }
+        .btn-group .c-btn:hover:not(:disabled) { background:#2a4060cc; }
+        .btn-group .c-btn:disabled { opacity:0.5; }
+
+        /* 学校Logo（按钮行最右侧，透明无框） */
+        .school-logo {
+            height:72px;
+            width:auto;
+            max-width:240px;
+            object-fit:contain;
+            flex-shrink:0;
+        }
+
+        /* ========== 信息行（按钮下方左侧状态，Logo下方右侧水深） ========== */
+        .info-row {
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+        }
+        .status-lines {
+            color:#8aacd0;
+            font-size:12px;
+            font-family:monospace;
+            line-height:1.65;
+            text-shadow:0 1px 3px rgba(0,0,0,0.7);
+            padding-left:2px;
+        }
+        .depth-display {
+            color:#b0d8ff;
+            font-size:13px;
+            font-family:monospace;
+            text-align:center;
+            white-space:nowrap;
+            text-shadow:0 1px 3px rgba(0,0,0,0.7);
+            padding-right:4px;
+        }
+        .depth-display .depth-value {
+            color:#7ab0d0;
+            font-weight:bold;
+        }
+
+        /* ========== 左下角滑块组 + 回放控件（无背景框） ========== */
+        .bottom-left-controls {
+            position:absolute;
+            bottom:14px;
+            left:14px;
+            display:flex;
+            flex-direction:column;
+            gap:5px;
+            z-index:20;
+            min-width:200px;
+        }
+        .slider-row {
+            display:flex;
+            align-items:center;
+            gap:6px;
+            height:22px;
+        }
+        .slider-row label {
+            color:#8aacd0;
+            font-size:12px;
+            font-weight:500;
+            min-width:42px;
+            white-space:nowrap;
+        }
+        .slider-row .slider-value {
+            color:#b0d8ff;
+            font-size:12px;
+            font-family:monospace;
+            min-width:34px;
+            text-align:right;
+        }
+        .slider-row.mode-slider input[type="range"] {
+            width:26px;
+            flex:0 0 26px;
+        }
+        .slider-row input[type="range"] {
+            flex:0 0 66px;
+            height:4px;
+            -webkit-appearance:none;
+            appearance:none;
+            background:#2a5a7a;
+            border-radius:2px;
+            outline:none;
+        }
+        .slider-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none;
+            appearance:none;
+            width:11px;
+            height:11px;
+            border-radius:50%;
+            background:#2c9678;
+            cursor:pointer;
+            border:2px solid #b0d8ff;
+        }
+        .slider-row .step-btn {
+            background:#1a2d44;
+            border:none;
+            color:#b0d8ff;
+            width:18px;
+            height:18px;
+            border-radius:50%;
+            font-size:13px;
+            line-height:1;
+            cursor:pointer;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            transition:0.15s;
+            border:1px solid #2a4a6a;
+        }
+        .slider-row .step-btn:hover { background:#2a4060; }
+        .slider-row .step-btn:active { transform:scale(0.9); }
+
+        /* 回放控件（默认隐藏） */
+        .playback-control {
+            display:none;
+            align-items:center;
+            gap:8px;
+            margin-top:3px;
+            padding-top:5px;
+            border-top:1px solid #1a3a5a;
+            width:100%;
+        }
+        .playback-control.active { display:flex; }
+        .playback-control .play-pause {
+            background:#1a2d44;
+            border:none;
+            color:#b0d8ff;
+            width:26px;
+            height:26px;
+            border-radius:50%;
+            font-size:14px;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border:1px solid #2a4a6a;
+            flex-shrink:0;
+        }
+        .playback-control .play-pause:hover { background:#2a4060; }
+        .playback-control input[type="range"] {
+            flex:1;
+            -webkit-appearance:none;
+            appearance:none;
+            height:4px;
+            background:#2a5a7a;
+            border-radius:2px;
+            outline:none;
+        }
+        .playback-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none;
+            appearance:none;
+            width:13px;
+            height:13px;
+            border-radius:50%;
+            background:#2c9678;
+            cursor:pointer;
+            border:2px solid #b0d8ff;
+        }
+        .playback-control .time-label {
+            color:#8aacd0;
+            font-size:12px;
+            font-family:monospace;
+            white-space:nowrap;
+        }
+
+        /* ========== 通用按钮 ========== */
+        .c-btn {
+            background:#1a2d44;
+            border:none;
+            border-radius:30px;
+            padding:6px 18px;
+            font-size:13px;
+            font-weight:500;
+            color:#e0f0ff;
+            cursor:pointer;
+            transition:all 0.2s;
+            box-shadow:0 1px 4px rgba(0,0,0,0.4);
+            white-space:nowrap;
+            height:36px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            letter-spacing:0.3px;
+        }
+        .c-btn:hover:not(:disabled) { background:#2a4060; transform:translateY(-1px); }
+        .c-btn:active:not(:disabled) { transform:translateY(1px); }
+        .c-btn:disabled { opacity:0.4; cursor:not-allowed; background:#141f30; }
+        .c-btn.power-on { background:#2c9678 !important; box-shadow:0 0 12px rgba(44,150,120,0.3); }
+        .c-btn.power-off { background:#ed5a65 !important; }
+
+        /* ========== 响应式调整 ========== */
+        @media (max-height:700px) {
+            .top-bar { height:26px; margin-bottom:2px; }
+            .win-btn { width:22px; height:22px; font-size:12px; }
+            .overlay-top { top:8px; left:10px; right:10px; gap:2px; }
+            .btn-group .c-btn { font-size:11px; height:24px; padding:3px 9px; }
+            .btn-group { gap:5px; }
+            .school-logo { height:50px; max-width:160px; }
+            .status-lines { font-size:10px; line-height:1.5; }
+            .depth-display { font-size:11px; }
+            .bottom-left-controls { bottom:8px; left:10px; gap:3px; }
+            .slider-row { height:18px; }
+            .slider-row label { font-size:10px; min-width:34px; }
+            .slider-row .slider-value { font-size:10px; min-width:28px; }
+            .slider-row input[type="range"] { flex:0 0 54px; }
+            .slider-row.mode-slider input[type="range"] { flex:0 0 22px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app" id="appContainer">
+    <!-- ======== 顶部栏：紧凑，仅右侧窗口控制 ======== -->
+    <div class="top-bar">
+        <div class="win-controls">
+            <button class="win-btn" id="minBtn" title="最小化（退出全屏）">−</button>
+            <button class="win-btn max" id="maxBtn" title="全屏/退出全屏">⛶</button>
+            <button class="win-btn close" id="closeBtn" title="关闭">✕</button>
+        </div>
+    </div>
+
+    <!-- ======== 图像区域 ======== -->
+    <div class="canvas-wrapper">
+        <canvas id="sonarCanvas" width="968" height="512"></canvas>
+
+        <!-- 按钮行+Logo + 信息行 -->
+        <div class="overlay-top">
+            <!-- 第一行：按钮靠左，Logo靠右 -->
+            <div class="controls-row">
+                <div class="btn-group">
+                    <button id="connectBtn" class="c-btn">连接</button>
+                    <button id="powerBtn" class="c-btn" disabled>发射</button>
+                    <button id="playbackBtn" class="c-btn">回放</button>
+                    <button id="recordBtn" class="c-btn">录制</button>
+                    <button id="countBtn" class="c-btn">计数</button>
+                    <button id="lengthBtn" class="c-btn">记长</button>
+                    <button id="actionBtn" class="c-btn">行为</button>
+                </div>
+                <img class="school-logo" src="浙江海洋大学校名校徽组合_透明背景.png" alt="浙江海洋大学">
+            </div>
+            <!-- 第二行：左侧状态三行，右侧水深（Logo正下方） -->
+            <div class="info-row">
+                <div class="status-lines">
+                    <div>帧号：<span id="frameDisplay">00000</span></div>
+                    <div id="dateDisplay">25/12/03 14:03:00</div>
+                    <div id="connectionStatus">未连接</div>
+                </div>
+                <span class="depth-display">🌊 水深：<span class="depth-value" id="depthDisplay">0.00</span> m</span>
+            </div>
+        </div>
+
+        <!-- 左下角滑块组 + 回放控件 -->
+        <div class="bottom-left-controls" id="controlsGroup">
+            <!-- 模式 -->
+            <div class="slider-row mode-slider">
+                <label>模式</label>
+                <input type="range" id="modeSlider" min="0" max="1" value="0" step="1">
+                <span class="slider-value" id="modeLabel">1.2M</span>
+            </div>
+            <!-- Gamma -->
+            <div class="slider-row">
+                <label>Gamma</label>
+                <button class="step-btn" data-target="gamma" data-dir="-1">−</button>
+                <input type="range" id="gammaSlider" min="0.50" max="1.50" value="1.20" step="0.01">
+                <button class="step-btn" data-target="gamma" data-dir="1">+</button>
+                <span class="slider-value" id="gammaValue">1.20</span>
+            </div>
+            <!-- 亮度 -->
+            <div class="slider-row">
+                <label>亮度</label>
+                <button class="step-btn" data-target="brightness" data-dir="-1">−</button>
+                <input type="range" id="brightnessSlider" min="0" max="60" value="30" step="1">
+                <button class="step-btn" data-target="brightness" data-dir="1">+</button>
+                <span class="slider-value" id="brightnessValue">30</span>
+            </div>
+            <!-- 探测距离 -->
+            <div class="slider-row">
+                <label>距离</label>
+                <button class="step-btn" data-target="distance" data-dir="-1">−</button>
+                <input type="range" id="distanceSlider" min="1" max="100" value="30" step="1">
+                <button class="step-btn" data-target="distance" data-dir="1">+</button>
+                <span class="slider-value" id="distanceValue">30</span>
+            </div>
+
+            <!-- 回放控制（默认隐藏） -->
+            <div class="playback-control" id="playbackControl">
+                <button class="play-pause" id="playPauseBtn">▶</button>
+                <span class="time-label" id="playbackTime">00:00</span>
+                <input type="range" id="playbackSlider" min="0" max="100" value="0">
+                <span class="time-label" id="playbackTotal">00:30</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===================================================================
+    // 1. 画布与绘图参数
+    // ===================================================================
+    const canvas = document.getElementById('sonarCanvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = 968;
+    const h = canvas.height = 512;
+    const centerX = w / 2;
+    const centerY = h - 40;
+    const maxRadius = Math.min(w, h) * 0.78;
+
+    let currentHalfAngle = 70;
+
+    function getSectorAngles() {
+        const halfRad = currentHalfAngle * Math.PI / 180;
+        const baseAngle = -Math.PI / 2;
+        return {
+            start: baseAngle - halfRad,
+            end: baseAngle + halfRad,
+            halfDeg: currentHalfAngle,
+            halfRad: halfRad,
+            baseAngle: baseAngle
+        };
+    }
+
+    // ===================================================================
+    // 2. 核心绘制函数
+    // ===================================================================
+    function drawSonar(active, time) {
+        ctx.fillStyle = '#081a30';
+        ctx.fillRect(0, 0, w, h);
+
+        const { start, end, halfDeg, halfRad, baseAngle } = getSectorAngles();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, maxRadius * 1.01, start, end);
+        ctx.closePath();
+        ctx.clip();
+
+        ctx.strokeStyle = '#2a5a7a';
+        ctx.lineWidth = 0.8;
+        for (let r = 0.2; r <= 1.0; r += 0.2) {
+            const radius = r * maxRadius;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+        for (let deg = -halfDeg; deg <= halfDeg; deg += 15) {
+            const rad = deg * Math.PI / 180 + baseAngle;
+            const x = centerX + Math.cos(rad) * maxRadius * 0.95;
+            const y = centerY + Math.sin(rad) * maxRadius * 0.95;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = '#6a9ac0';
+        ctx.font = '11px monospace';
+        for (let deg = -60; deg <= 60; deg += 30) {
+            if (Math.abs(deg) > halfDeg) continue;
+            const rad = deg * Math.PI / 180 + baseAngle;
+            const labelR = maxRadius * 0.88;
+            const x = centerX + Math.cos(rad) * labelR;
+            const y = centerY + Math.sin(rad) * labelR;
+            ctx.fillText(deg + '°', x-10, y+4);
+        }
+        for (let r = 0.2; r <= 0.8; r += 0.2) {
+            const radius = r * maxRadius;
+            ctx.fillText((r * 30).toFixed(0) + 'm', centerX + radius - 15, centerY + 18);
+        }
+
+        ctx.strokeStyle = '#4a8aae';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, maxRadius * 0.98, start, end);
+        ctx.lineTo(centerX, centerY);
+        ctx.stroke();
+
+        if (!active) {
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, maxRadius * 0.9, start, end);
+            ctx.closePath();
+            ctx.fillStyle = '#0a1a2a';
+            ctx.fill();
+            ctx.strokeStyle = '#2a5a7a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.restore();
+            return;
+        }
+
+        const pulse = (Math.sin(time * 8) * 0.25 + 0.75);
+        const steps = 200;
+        for (let i = steps; i > 0; i--) {
+            const r = (i / steps) * maxRadius;
+            const t = 1 - (i / steps);
+            let intensity = (1 - t) * (0.6 + pulse * 0.3) + Math.random() * 0.15;
+            intensity = Math.min(1, Math.max(0, intensity));
+            let rCol, gCol, bCol;
+            if (intensity < 0.33) {
+                const u = intensity / 0.33;
+                rCol = 0;
+                gCol = 0.5 + u * 0.5;
+                bCol = 1;
+            } else if (intensity < 0.66) {
+                const u = (intensity - 0.33) / 0.33;
+                rCol = u;
+                gCol = 1;
+                bCol = 1 - u;
+            } else {
+                const u = (intensity - 0.66) / 0.34;
+                rCol = 1;
+                gCol = 1 - u;
+                bCol = 0;
+            }
+            const rVal = Math.floor(rCol * 255);
+            const gVal = Math.floor(gCol * 255);
+            const bVal = Math.floor(bCol * 255);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, r, start, end);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(${rVal}, ${gVal}, ${bVal}, 0.35)`;
+            ctx.fill();
+        }
+
+        const targets = [];
+        for (let i = 0; i < 600; i++) {
+            const rad = Math.random() * maxRadius;
+            const angle = start + Math.random() * (end - start);
+            const x = centerX + Math.cos(angle) * rad;
+            const y = centerY + Math.sin(angle) * rad;
+            const bright = 0.3 + Math.random() * 0.7;
+            if (bright > 0.6) {
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#ffaa44';
+                ctx.fillStyle = `rgba(255, 200, 100, ${bright})`;
+                ctx.beginPath();
+                ctx.arc(x, y, 1.5 + Math.random() * 3, 0, 2 * Math.PI);
+                ctx.fill();
+                targets.push({x, y, rad: 4});
+            }
+        }
+        for (let t = 0; t < 12; t++) {
+            const angleVar = start + Math.random() * (end - start);
+            const radiusVar = maxRadius * (0.1 + Math.random() * 0.7);
+            const xTar = centerX + Math.cos(angleVar) * radiusVar;
+            const yTar = centerY + Math.sin(angleVar) * radiusVar;
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = "#ffaa33";
+            ctx.beginPath();
+            ctx.arc(xTar, yTar, 6 + Math.random() * 10, 0, 2 * Math.PI);
+            ctx.fillStyle = `rgba(255, 200, 50, ${0.6+Math.sin(time*5)*0.2})`;
+            ctx.fill();
+            targets.push({x: xTar, y: yTar, rad: 12});
+        }
+        ctx.shadowBlur = 0;
+        window._simTargets = targets;
+
+        ctx.restore();
+    }
+
+    // ===================================================================
+    // 3. 动画循环
+    // ===================================================================
+    let animationId = null;
+    let isSonarActive = false;
+    let isConnected = false;
+    let powerState = false;
+
+    function animate() {
+        const time = Date.now() / 1000;
+        drawSonar(isSonarActive, time);
+        animationId = requestAnimationFrame(animate);
+    }
+    animate();
+
+    // ===================================================================
+    // 4. UI 交互
+    // ===================================================================
+    const connectBtn    = document.getElementById('connectBtn');
+    const powerBtn      = document.getElementById('powerBtn');
+    const playbackBtn   = document.getElementById('playbackBtn');
+    const recordBtn     = document.getElementById('recordBtn');
+    const countBtn      = document.getElementById('countBtn');
+    const lengthBtn     = document.getElementById('lengthBtn');
+    const actionBtn     = document.getElementById('actionBtn');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const frameDisplay  = document.getElementById('frameDisplay');
+    const dateDisplay   = document.getElementById('dateDisplay');
+    const depthDisplay  = document.getElementById('depthDisplay');
+
+    // 滑块
+    const modeSlider      = document.getElementById('modeSlider');
+    const modeLabel       = document.getElementById('modeLabel');
+    const gammaSlider     = document.getElementById('gammaSlider');
+    const gammaValue      = document.getElementById('gammaValue');
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const brightnessValue = document.getElementById('brightnessValue');
+    const distanceSlider  = document.getElementById('distanceSlider');
+    const distanceValue   = document.getElementById('distanceValue');
+
+    // 回放控件
+    const playbackControl   = document.getElementById('playbackControl');
+    const playbackSlider    = document.getElementById('playbackSlider');
+    const playPauseBtn      = document.getElementById('playPauseBtn');
+    const playbackTimeLabel = document.getElementById('playbackTime');
+    const playbackTotalLabel = document.getElementById('playbackTotal');
+
+    // 窗口控制
+    const minBtn   = document.getElementById('minBtn');
+    const maxBtn   = document.getElementById('maxBtn');
+    const closeBtn = document.getElementById('closeBtn');
+
+    let connectTimer = null;
+    let playbackActive = false;
+    let frameCounter = 0;
+    let progressInterval = null;
+    let progressValue = 0;
+    let isPaused = false;
+    const mockDevices = ['FS-90 Forward', 'LH-Mini 300', 'Sapphire Pro'];
+    let currentDevice = '未连接';
+
+    // ===== 更新模式 =====
+    function updateMode() {
+        const val = parseInt(modeSlider.value);
+        const isLow = (val === 0);
+        modeLabel.textContent = isLow ? '1.2M' : '2.1M';
+        currentHalfAngle = isLow ? 70 : 30;
+        const minDist = isLow ? 1 : 1;
+        const maxDist = isLow ? 100 : 30;
+        distanceSlider.min = minDist;
+        distanceSlider.max = maxDist;
+        if (parseInt(distanceSlider.value) > maxDist) distanceSlider.value = maxDist;
+        if (parseInt(distanceSlider.value) < minDist) distanceSlider.value = minDist;
+        distanceValue.textContent = distanceSlider.value;
+        if (isConnected) showStatus(`模式切换至 ${modeLabel.textContent} (开角${currentHalfAngle*2}°)`);
+    }
+    modeSlider.addEventListener('input', updateMode);
+
+    // ===== 滑块事件 =====
+    gammaSlider.addEventListener('input', function() {
+        const val = parseFloat(this.value).toFixed(2);
+        gammaValue.textContent = val;
+        if (isConnected) console.log(`Gamma set to ${val}`);
+    });
+    brightnessSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        brightnessValue.textContent = val;
+        if (isConnected) console.log(`Brightness set to ${val}`);
+    });
+    distanceSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        distanceValue.textContent = val;
+        if (isConnected) console.log(`探测距离 set to ${val}`);
+    });
+
+    // ===== 微调按钮 =====
+    document.querySelectorAll('.step-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const target = this.dataset.target;
+            const dir = parseInt(this.dataset.dir);
+            let slider, step;
+            if (target === 'gamma') {
+                slider = gammaSlider;
+                step = parseFloat(slider.step) || 0.01;
+                let val = parseFloat(slider.value) + dir * step;
+                val = Math.min(parseFloat(slider.max), Math.max(parseFloat(slider.min), val));
+                slider.value = val;
+                slider.dispatchEvent(new Event('input'));
+            } else if (target === 'brightness') {
+                slider = brightnessSlider;
+                step = parseInt(slider.step) || 1;
+                let val = parseInt(slider.value) + dir * step;
+                val = Math.min(parseInt(slider.max), Math.max(parseInt(slider.min), val));
+                slider.value = val;
+                slider.dispatchEvent(new Event('input'));
+            } else if (target === 'distance') {
+                slider = distanceSlider;
+                step = parseInt(slider.step) || 1;
+                let val = parseInt(slider.value) + dir * step;
+                val = Math.min(parseInt(slider.max), Math.max(parseInt(slider.min), val));
+                slider.value = val;
+                slider.dispatchEvent(new Event('input'));
+            }
+        });
+    });
+
+    // ===== 状态提示 =====
+    function showStatus(msg, isError = false) {
+        connectionStatus.textContent = msg;
+        connectionStatus.style.color = isError ? '#ed5a65' : '#8aacd0';
+        console.log(`[Status] ${msg}`);
+    }
+
+    // ===== 更新界面状态 =====
+    function updateUIState() {
+        const enable = isConnected;
+        powerBtn.disabled = !enable;
+        playbackBtn.disabled = enable;
+        lengthBtn.disabled = !enable;
+        actionBtn.disabled = !enable;
+        countBtn.disabled = !enable;
+        if (!enable) {
+            if (powerState) {
+                powerState = false;
+                isSonarActive = false;
+                powerBtn.textContent = '发射';
+                powerBtn.classList.remove('power-off', 'power-on');
+            }
+            connectionStatus.textContent = '未连接';
+            connectionStatus.style.color = '#8aacd0';
+            playbackControl.classList.remove('active');
+            if (playbackActive) stopPlayback();
+        } else {
+            currentDevice = mockDevices[Math.floor(Math.random() * mockDevices.length)];
+            showStatus(`已连接 ${currentDevice}`, false);
+        }
+        updateStatus();
+    }
+
+    function updateStatus() {
+        const now = new Date();
+        const timeStr = now.toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '/');
+        frameDisplay.textContent = String(frameCounter).padStart(5, '0');
+        dateDisplay.textContent = timeStr;
+        if (isConnected || playbackActive) frameCounter = (frameCounter + 1) % 99999;
+        const depth = (Math.random() * 20 + 2).toFixed(2);
+        depthDisplay.textContent = depth;
+    }
+    setInterval(updateStatus, 1000);
+
+    // ===== 连接按钮 =====
+    connectBtn.addEventListener('click', function() {
+        if (this.textContent === '连接') {
+            this.textContent = '连接中...';
+            this.disabled = true;
+            if (connectTimer) clearTimeout(connectTimer);
+            connectTimer = setTimeout(() => {
+                isConnected = true;
+                this.textContent = '断开连接';
+                this.disabled = false;
+                powerState = false;
+                isSonarActive = false;
+                powerBtn.textContent = '发射';
+                powerBtn.classList.remove('power-on', 'power-off');
+                updateUIState();
+                showStatus('✅ 设备连接成功');
+            }, 1500);
+        } else {
+            if (connectTimer) clearTimeout(connectTimer);
+            isConnected = false;
+            this.textContent = '连接';
+            this.disabled = false;
+            if (powerState) {
+                powerState = false;
+                isSonarActive = false;
+                powerBtn.textContent = '发射';
+                powerBtn.classList.remove('power-on', 'power-off');
+            }
+            if (playbackActive) stopPlayback();
+            updateUIState();
+            showStatus('🔌 已断开连接', true);
+        }
+    });
+
+    // ===== 发射按钮 =====
+    powerBtn.addEventListener('click', function() {
+        if (!isConnected) { showStatus('请先连接设备', true); return; }
+        if (powerState) {
+            powerState = false;
+            isSonarActive = false;
+            this.textContent = '发射';
+            this.classList.remove('power-off');
+            this.classList.add('c-btn');
+            showStatus('发射关闭');
+        } else {
+            powerState = true;
+            isSonarActive = true;
+            this.textContent = '关闭';
+            this.classList.remove('c-btn');
+            this.classList.add('power-off');
+            showStatus('发射开启 · 功率255');
+        }
+    });
+
+    // ===== 回放 =====
+    function stopPlayback() {
+        playbackActive = false;
+        playbackBtn.textContent = '回放';
+        if (isConnected) playbackBtn.disabled = true;
+        else playbackBtn.disabled = false;
+        if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+        playbackControl.classList.remove('active');
+        if (!isConnected) {
+            isSonarActive = false;
+            powerState = false;
+            powerBtn.textContent = '发射';
+            powerBtn.classList.remove('power-off', 'power-on');
+        } else {
+            isSonarActive = powerState;
+        }
+        showStatus('回放已停止');
+        connectBtn.disabled = false;
+        powerBtn.disabled = !isConnected;
+        recordBtn.disabled = false;
+        countBtn.disabled = !isConnected;
+        lengthBtn.disabled = !isConnected;
+        actionBtn.disabled = !isConnected;
+        updateMode();
+    }
+
+    playbackBtn.addEventListener('click', function() {
+        if (playbackActive) {
+            stopPlayback();
+            return;
+        }
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.DB';
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                showStatus(`回放文件: ${file.name} (模拟)`);
+                playbackActive = true;
+                this.textContent = '停止';
+                playbackControl.classList.add('active');
+                playbackSlider.value = 0;
+                playbackTimeLabel.textContent = '00:00';
+                playbackTotalLabel.textContent = '00:30';
+                progressValue = 0;
+                isPaused = false;
+                playPauseBtn.textContent = '⏸';
+                if (progressInterval) clearInterval(progressInterval);
+                progressInterval = setInterval(() => {
+                    if (!playbackActive || isPaused) return;
+                    progressValue = Math.min(100, progressValue + 0.5);
+                    playbackSlider.value = progressValue;
+                    const sec = Math.floor(progressValue / 100 * 30);
+                    playbackTimeLabel.textContent = `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+                    if (progressValue >= 100) {
+                        clearInterval(progressInterval);
+                        progressInterval = null;
+                        showStatus('回放结束');
+                        stopPlayback();
+                    }
+                }, 150);
+                isSonarActive = true;
+                connectBtn.disabled = true;
+                powerBtn.disabled = true;
+                recordBtn.disabled = true;
+                countBtn.disabled = true;
+                lengthBtn.disabled = true;
+                actionBtn.disabled = true;
+                ctx.fillStyle = '#ffffffcc';
+                ctx.font = 'bold 18px monospace';
+                ctx.shadowBlur = 0;
+                ctx.fillText(`[回放] ${file.name.slice(0,16)}`, 30, 50);
+                updateMode();
+            } else {
+                showStatus('未选择文件', true);
+            }
+        };
+        fileInput.click();
+    });
+
+    playbackSlider.addEventListener('input', function() {
+        if (!playbackActive) return;
+        progressValue = parseFloat(this.value);
+        const sec = Math.floor(progressValue / 100 * 30);
+        playbackTimeLabel.textContent = `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+        showStatus(`跳转到 ${playbackTimeLabel.textContent}`);
+    });
+
+    playPauseBtn.addEventListener('click', function() {
+        if (!playbackActive) return;
+        isPaused = !isPaused;
+        this.textContent = isPaused ? '▶' : '⏸';
+        showStatus(isPaused ? '回放暂停' : '回放继续');
+    });
+
+    // ===== 录制 =====
+    recordBtn.addEventListener('click', function() {
+        if (!isConnected && !playbackActive) {
+            showStatus('请先连接设备或回放', true);
+            return;
+        }
+        const dummyData = new Uint8Array(1024 * 10);
+        for (let i = 0; i < dummyData.length; i++) dummyData[i] = Math.floor(Math.random() * 256);
+        const blob = new Blob([dummyData.buffer], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sonar_data_${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.DB`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showStatus('📀 录制保存 DB 文件 (模拟)');
+    });
+
+    // ===== 计数 =====
+    countBtn.addEventListener('click', function() {
+        if (!isConnected && !playbackActive) {
+            showStatus('请先连接或回放', true);
+            return;
+        }
+        const targets = window._simTargets || [];
+        const fish = targets.filter(t => t.rad > 6);
+        alert(`🐟 当前扇形区域内检测到 ${fish.length} 个目标（亮斑/鱼群）\n(模拟计数，仅作演示)`);
+        showStatus(`计数完成: ${fish.length} 个目标`);
+    });
+
+    // ===== 记长 =====
+    lengthBtn.addEventListener('click', function() {
+        if (!isConnected && !playbackActive) {
+            showStatus('请先连接或回放', true);
+            return;
+        }
+        const targets = window._simTargets || [];
+        const bigFish = targets.filter(t => t.rad > 6);
+        const avgLen = bigFish.length > 0 ? (Math.random() * 40 + 10).toFixed(1) : '0.0';
+        alert(`📏 当前扇形区域内检测到 ${bigFish.length} 条鱼\n估算平均体长：${avgLen} cm\n(模拟记长，仅作演示)`);
+        showStatus(`记长完成: 均长 ${avgLen} cm`);
+    });
+
+    // ===== 行为 =====
+    actionBtn.addEventListener('click', function() {
+        if (!isConnected && !playbackActive) {
+            showStatus('请先连接或回放', true);
+            return;
+        }
+        const behaviors = ['集群游动 🐟🐟🐟', '散落觅食 🐟  🐟', '快速逃逸 💨🐟', '缓慢巡游 🐟→', '静止悬浮 🐟'];
+        const picked = behaviors[Math.floor(Math.random() * behaviors.length)];
+        alert(`🎯 当前鱼群行为分析：\n${picked}\n(模拟行为识别，仅作演示)`);
+        showStatus(`行为分析: ${picked}`);
+    });
+
+    // ===== 窗口控制 =====
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                showStatus('全屏请求被拒绝', true);
+            });
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    }
+    maxBtn.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', function() {
+        updateScale();
+    });
+    minBtn.addEventListener('click', function() {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else showStatus('请使用浏览器最小化', false);
+    });
+    closeBtn.addEventListener('click', function() {
+        if (confirm('确定要关闭吗？')) {
+            window.close();
+            setTimeout(() => { showStatus('请手动关闭浏览器标签页', true); }, 500);
+        }
+    });
+
+    // ===== 初始化 =====
+    updateUIState();
+    powerBtn.disabled = true;
+    lengthBtn.disabled = true;
+    actionBtn.disabled = true;
+    updateMode();
+
+    // Logo 加载失败占位
+    document.querySelector('.school-logo')?.addEventListener('error', function() {
+        this.style.display = 'none';
+        const span = document.createElement('span');
+        span.textContent = '🏫 浙江海洋大学';
+        span.style.color = '#8aacd0';
+        span.style.fontSize = '13px';
+        span.style.background = '#1a2d44cc';
+        span.style.padding = '4px 12px';
+        span.style.borderRadius = '30px';
+        span.style.border = '1px solid #2a4a6a';
+        span.style.textShadow = '0 1px 3px rgba(0,0,0,0.7)';
+        this.parentNode.appendChild(span);
+    });
+
+    // ===================================================================
+    // 5. 窗口自适应缩放
+    // ===================================================================
+    const appContainer = document.getElementById('appContainer');
+    const BASE_WIDTH = 968;
+    const BASE_HEIGHT = 820;
+
+    function updateScale() {
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        const scaleX = winW / BASE_WIDTH;
+        const scaleY = winH / BASE_HEIGHT;
+        const scale = Math.min(scaleX, scaleY) * 0.95;
+        appContainer.style.transform = `scale(${scale})`;
+        appContainer.style.left = (winW - BASE_WIDTH * scale) / 2 + 'px';
+        appContainer.style.top = (winH - BASE_HEIGHT * scale) / 2 + 'px';
+    }
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('load', updateScale);
+
+    // 清理
+    window.addEventListener('beforeunload', function() {
+        if (connectTimer) clearTimeout(connectTimer);
+        if (progressInterval) clearInterval(progressInterval);
+        if (animationId) cancelAnimationFrame(animationId);
+    });
+
+    setTimeout(() => { showStatus('🚀 点击「连接」开始体验'); }, 600);
+</script>
+</body>
+</html>
