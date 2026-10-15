@@ -9,6 +9,12 @@ UDP_DEV_ASK_PORT = 9001;     #设备udp查询端口
 IMAGE_WIDTH = 968;
 IMAGE_HEIGHT = 512;
 
+# ==================== 显示方向开关 ====================
+# True  = 上下翻转显示（与原厂 C++ 版 mainwindow.cpp 的 img.mirrored(false, true) 一致）
+# False = 保持声呐原始方向
+FLIP_VERTICAL = True
+# =====================================================
+
 PACK_INFO_SIZE = 256;  #包头信息长度
 PACK_DATA_INDEX = 256; #每包数据索引
 PACK_MAX_NUM = 12000;  #每帧数据最大包数
@@ -18,6 +24,7 @@ import socket
 import struct
 import psutil
 import ctypes
+import queue
 import time
 import threading
 import numpy as np
@@ -37,6 +44,22 @@ from collections import defaultdict
 #     pyside6-uic form.ui -o ui_form.py, or
 #     pyside2-uic form.ui -o ui_form.py
 from ui_form import Ui_Widget
+
+
+def apply_orientation(img):
+    """统一处理显示方向，并返回一份独立副本。
+
+    - FLIP_VERTICAL=True 时做上下翻转
+    - 无论是否翻转都返回 .copy()，避免 QImage 复用 frameDataBuf 内存
+      （原代码中 packType==2 的 QImage 直接引用 numpy 缓冲，
+        下一帧写入会污染仍留在队列中的旧图像）
+    """
+    if img is None:
+        return None
+    if FLIP_VERTICAL:
+        img = img.mirrored(False, True)
+    return img.copy()
+
 
 # 定义udp广播包结构体
 class DeviceDetailData(ctypes.Structure):
@@ -193,52 +216,144 @@ class Widget(QWidget):
         hostname = socket.gethostname()
         # 使用主机名获取本机的 IP 地址
         self.local_ip = socket.gethostbyname(hostname)
+        self.m_udpSocket = None  # 延迟到子线程内创建（对齐 C++ udpInit）
 
+        # ---- 线程安全：用 queue + QTimer 接收子线程图像 ----
+        self.image_queue = queue.Queue(maxsize=10)
+
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(33)  # ~30 fps
+        self._poll_timer.timeout.connect(self._poll_image_queue)
+        self._poll_timer.start()
+
+    @Slot()
+    def _poll_image_queue(self):
+        """主线程定时轮询队列，取出图像更新 GUI"""
         try:
-            # 创建 UDP 套接字
-            self.m_udpSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-            # 设置接收缓冲区大小为 10MB
-            netBuffer = 1024 * 1024 * 10
-            self.m_udpSocket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, netBuffer)
-
-            # 设置接收超时时间为 50ms
-            outTime = 0.05  # Python 中以秒为单位
-            self.m_udpSocket.settimeout(outTime)
-
-            # 绑定到指定端口
-            m_udpAddr = (self.local_ip, UDP_REC_SDK_PORT)  # 绑定到所有可用的网络接口
-            self.m_udpSocket.bind(m_udpAddr)
-            print(f"UDPbind成功 IP {self.local_ip} port {UDP_REC_SDK_PORT}")
-
-        except self.m_udpSocket.error as e:
-            print(f"bind失败 IP {self.local_ip} port {UDP_REC_SDK_PORT}: {e}")
+            while True:
+                image, device_name = self.image_queue.get_nowait()
+                self.m_imageLabel.setPixmap(QPixmap.fromImage(image))
+                self.m_imageLabel.show()
+                self.label_name.setText(device_name)
+                print(f"[GUI] 图像已显示, 设备: {device_name}")
+        except queue.Empty:
+            pass
 
     def worker_udp(self):
-        print("子线程开启,udp接收与成像")
-        count = 0
+        print(f"子线程开启,udp接收与成像, PACK_SIZE={self.PACK_SIZE}")
 
+        # ---- 在子线程内创建 socket（对齐 C++ UdpReceiver::udpInit） ----
+        try:
+            self.m_udpSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            netBuffer = 1024 * 1024 * 10
+            self.m_udpSocket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, netBuffer)
+            self.m_udpSocket.settimeout(0.05)  # 50ms
+            self.m_udpSocket.bind(('0.0.0.0', UDP_REC_SDK_PORT))
+            print(f"[UDP] 子线程内 socket 绑定成功 0.0.0.0:{UDP_REC_SDK_PORT}")
+        except OSError as e:
+            print(f"[UDP] 子线程内 socket 绑定失败: {e}")
+            return
+
+        count = 0
         tempImage = QImage()
         frameDataBuf = np.zeros(1024 * 1024 * 10, dtype=np.uint8)
+        # packType 0 / 2 所需缓冲区
+        m_intensity = np.zeros(PACK_MAX_NUM * self.PACK_SIZE, dtype=np.double)
+        m_panSectorMemory = np.zeros(PACK_MAX_NUM * self.PACK_SIZE, dtype=np.uint8)
 
+        packet_count = 0
         while self.runFlag_udp:
             try:
-                data, addr = self.m_udpSocket.recvfrom(self.PACK_SIZE)
+                data, addr = self.m_udpSocket.recvfrom(65535)  # 最大 UDP 包
             except socket.timeout:
                 continue  # 在超时时继续等待
+            except Exception as e:
+                print(f"[UDP] recvfrom 异常 ({type(e).__name__}): {e}")
+                continue
+            packet_count += 1
+            if packet_count <= 3 or packet_count % 200 == 1:
+                print(f"[UDP] 收到第 {packet_count} 个数据包, 来自 {addr}, 大小={len(data)}")
             # 成像
-            uint8_data = np.frombuffer(data, dtype = np.uint8)
+            uint8_data = np.frombuffer(data, dtype=np.uint8)
             ret = self.m_lhForwardFrame.writeOnePackData(uint8_data)
             if ret == pyLhForwardSDK_module.LfFrameRet.oneFrameOK:
                 self.m_lhForwardFrame.getOneFrame(self.curFrameInfo, frameDataBuf)
 
-                #显示设备名
-                self.label_name.setText(self.curFrameInfo.deviceName)
+                # 设备名（c_char 数组 → str）
+                device_name = self.curFrameInfo.deviceName
+                if isinstance(device_name, bytes):
+                    device_name = device_name.decode('utf-8', errors='replace').rstrip('\x00')
 
-                #显示图像
-                if tempImage.loadFromData(frameDataBuf.tobytes(), "jpg"):
-                    self.m_imageLabel.setPixmap(QPixmap.fromImage(tempImage))
-                    self.m_imageLabel.show()
+                print(f"[UDP] 收到完整帧, packType={self.curFrameInfo.packType}, 设备={device_name}")
+
+                image = None
+
+                # ---- 根据 packType 分别处理 ----
+                if self.curFrameInfo.packType == 0:
+                    # 原始扇区数据 → 用 SDK 生成扇区图
+                    panSize = max(IMAGE_WIDTH, IMAGE_HEIGHT)
+                    lwidth = IMAGE_WIDTH
+                    lheight = IMAGE_HEIGHT
+                    if self.curFrameInfo.horAngleReso == 360:
+                        lwidth = panSize
+                        lheight = panSize
+
+                    m_panSectorMemory = np.zeros(lwidth * lheight, dtype=np.uint8)
+                    imageRes = np.array([0.0], dtype=np.float64)
+
+                    self.m_lhForwardImage.generateForwardImage(
+                        self.curFrameInfo, frameDataBuf, m_panSectorMemory, imageRes)
+                    tempImg = QImage(m_panSectorMemory, lwidth, lheight, QImage.Format_Grayscale8)
+
+                    # 等比缩放至 QLabel 高度
+                    if tempImg.height() > self.m_imageLabel.height():
+                        tempImg = tempImg.scaledToHeight(self.m_imageLabel.height())
+
+                    # 居中裁剪
+                    img_w, img_h = tempImg.width(), tempImg.height()
+                    label_w, label_h = self.m_imageLabel.width(), self.m_imageLabel.height()
+                    start_x = max(0, int((img_w - label_w) / 2))
+                    start_y = max(0, int((img_h - label_h) / 2))
+                    tempImg = tempImg.copy(start_x, start_y, label_w, label_h)
+
+                    image = apply_orientation(tempImg)
+
+                elif self.curFrameInfo.packType == 2:
+                    # 波束数据 → 预处理后转灰度图
+                    self.m_lhForwardImage.preprocessData(
+                        self.curFrameInfo, frameDataBuf, m_intensity)
+                    coef = 256
+                    if self.curFrameInfo.dataWidth == 0x00:
+                        coef = 1
+
+                    for i in range(self.curFrameInfo.numPerRow * self.curFrameInfo.dataHeight):
+                        frameDataBuf[i] = m_intensity[i] // coef
+
+                    image = QImage(
+                        frameDataBuf.data,
+                        self.curFrameInfo.numPerRow,
+                        self.curFrameInfo.dataHeight,
+                        QImage.Format_Indexed8)
+                    image = apply_orientation(image)
+
+                elif self.curFrameInfo.packType == 3:
+                    if tempImage.loadFromData(frameDataBuf.tobytes(), "png"):
+                        image = apply_orientation(tempImage)
+
+                elif self.curFrameInfo.packType == 4:
+                    if tempImage.loadFromData(frameDataBuf.tobytes(), "jpg"):
+                        image = apply_orientation(tempImage)
+
+                # ---- 通过队列发送到主线程显示 ----
+                if image is not None:
+                    try:
+                        self.image_queue.put_nowait((image, device_name))
+                        print(f"[UDP] 图像入队成功, 尺寸={image.width()}x{image.height()}")
+                    except queue.Full:
+                        print("[UDP] 队列已满，丢弃一帧")
+                else:
+                    print(f"[UDP] 警告: packType={self.curFrameInfo.packType} 未处理或解码失败")
+
             count = count + 1
             if count >= 10:
                 count = 0
@@ -300,11 +415,21 @@ class Widget(QWidget):
             finally:
                 sock.close()
 
-        # 建立TCP链接
+        # ---- 探测本机正确 IP（模拟 C++ getHostSocket/getsockname 逻辑） ----
+        try:
+            probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            probe.connect((ip_address_string, 1))
+            correct_ip = probe.getsockname()[0]
+            probe.close()
+            print(f"声呐可达本机IP: {correct_ip} (gethostbyname: {self.local_ip})")
+        except Exception:
+            correct_ip = self.local_ip
+
+        # 建立TCP链接（传入本机 IP，SDK 内部绑定正确网卡）
         print("调用cmd库，建立TCP链接!")
         self.cmd = pyLhForwardSDK_module.LhForwardCMD(ip_address_string, TCP_CMD_PORT)
 
-        ret = self.cmd.connectDevice()
+        ret = self.cmd.connectDevice(correct_ip)
 
         # 更新工作模式下拉框(广播连接才有，需要广播包)
         if self.not_ip:
@@ -318,27 +443,26 @@ class Widget(QWidget):
 
         if ret == pyLhForwardSDK_module.LfCMDRet.ok:
             self.m_connectPBtn.setText("断开连接")
-            ret1 = self.cmd.sendCMD(pyLhForwardSDK_module.LfCMDInfo.dataSource, 4)  # 设置上传数据类型为jpg
+            ret1 = self.cmd.sendCMD(pyLhForwardSDK_module.LfCMDInfo.dataSource, 3)  # PNG（与 C++ 原厂一致）
 
             if ret1 == pyLhForwardSDK_module.LfCMDRet.ok:
                 print("命令发送成功,设置上传数据源")
-            time.sleep(0.2)
+            time.sleep(1)  # 与 C++ 原厂 Sleep(1e3) 一致
 
-
-            # 将IP地址转换为4字节数组
-            ip_bytes = list(map(int, self.local_ip.split('.')))
+            # 将 IP 地址转换为 4 字节数组
+            ip_bytes = list(map(int, correct_ip.split('.')))
 
             ret2 = self.cmd.sendCMD(pyLhForwardSDK_module.LfCMDInfo.udpData, ip_bytes, UDP_REC_SDK_PORT)
 
             if ret2 == pyLhForwardSDK_module.LfCMDRet.ok:
                 print("命令发送成功,设置声呐数据接收IP和端口")
-            time.sleep(0.2)
+            time.sleep(1)  # 与 C++ 一致
 
             ret3 = self.cmd.sendCMD(pyLhForwardSDK_module.LfCMDInfo.startStop, 1) # 启动
 
             if ret3 == pyLhForwardSDK_module.LfCMDRet.ok:
                 print("命令发送成功,声呐启动")
-            time.sleep(0.2)
+            time.sleep(1)  # 与 C++ 一致
 
             # ret4 = self.cmd.sendCMD(pyLhForwardSDK_module.LfCMDInfo.perid, 1000) # 工作周期
 
@@ -404,10 +528,14 @@ class Widget(QWidget):
                     if ret == pyLhForwardSDK_module.LfFrameRet.oneFrameOK:
                         self.m_lhForwardFrame.getOneFrame(self.curFrameInfo, frameDataBuf)
 
-                        #显示设备名
-                        self.label_name.setText(self.curFrameInfo.deviceName)
+                        # 设备名（c_char 数组 → str）
+                        device_name = self.curFrameInfo.deviceName
+                        if isinstance(device_name, bytes):
+                            device_name = device_name.decode('utf-8', errors='replace').rstrip('\x00')
 
-                        #显示图像
+                        image = None
+
+                        # ---- 根据 packType 分别处理 ----
                         if self.curFrameInfo.packType == 0:
                             # 计算尺寸
                             panSize = max(IMAGE_WIDTH, IMAGE_HEIGHT)
@@ -435,8 +563,7 @@ class Widget(QWidget):
                             start_y = max(0, int((img_h - label_h) / 2))
                             tempImg = tempImg.copy(start_x, start_y, label_w, label_h)
 
-                            self.m_imageLabel.setPixmap(QPixmap.fromImage(tempImg))
-                            self.m_imageLabel.show()
+                            image = apply_orientation(tempImg)
 
                         elif self.curFrameInfo.packType == 2:
                             self.m_lhForwardImage.preprocessData(self.curFrameInfo, frameDataBuf, m_intensity)
@@ -448,19 +575,23 @@ class Widget(QWidget):
                             for i in range(self.curFrameInfo.numPerRow * self.curFrameInfo.dataHeight):
                                 frameDataBuf[i] = m_intensity[i] // coef
 
-                            tempImg = QImage(frameDataBuf.data, self.curFrameInfo.numPerRow, self.curFrameInfo.dataHeight, QImage.Format_Indexed8)
-                            self.m_imageLabel.setPixmap(QPixmap.fromImage(tempImg))
-                            self.m_imageLabel.show()
+                            image = QImage(frameDataBuf.data, self.curFrameInfo.numPerRow, self.curFrameInfo.dataHeight, QImage.Format_Indexed8)
+                            image = apply_orientation(image)
 
                         elif self.curFrameInfo.packType == 3:
                             if tempImage.loadFromData(frameDataBuf.tobytes(), "png"):
-                                self.m_imageLabel.setPixmap(QPixmap.fromImage(tempImage))
-                                self.m_imageLabel.show()
+                                image = apply_orientation(tempImage)
 
                         elif self.curFrameInfo.packType == 4:
                             if tempImage.loadFromData(frameDataBuf.tobytes(), "jpg"):
-                                self.m_imageLabel.setPixmap(QPixmap.fromImage(tempImage))
-                                self.m_imageLabel.show()
+                                image = apply_orientation(tempImage)
+
+                        # ---- 通过队列发送到主线程显示 ----
+                        if image is not None:
+                            try:
+                                self.image_queue.put_nowait((image, device_name))
+                            except queue.Full:
+                                pass
 
                     count = count + 1
                     if count >= 10:
@@ -504,14 +635,22 @@ class Widget(QWidget):
 
     @Slot()
     def setGamma(self):
-        temp = float(self.text_gamma.toPlainText())
+        text = self.text_gamma.toPlainText().strip()
+        if not text:
+            print("gamma: 输入为空，跳过")
+            return
+        temp = float(text)
         ret = self.cmd.sendCMD(pyLhForwardSDK_module.LfCMDInfo.gamma, temp)
         if ret == pyLhForwardSDK_module.LfCMDRet.ok:
             print(f"gamma: {temp}")
 
     @Slot()
     def setMaxDistance(self):
-        temp = float(self.text_distance.toPlainText())
+        text = self.text_distance.toPlainText().strip()
+        if not text:
+            print("maxDist: 输入为空，跳过")
+            return
+        temp = float(text)
         ret = self.cmd.sendCMD(pyLhForwardSDK_module.LfCMDInfo.maxDist, temp)
         print(f"ret:{ret}")
         if ret == pyLhForwardSDK_module.LfCMDRet.ok:
@@ -523,7 +662,8 @@ class Widget(QWidget):
         self.runFlag_udp = False
         if self.thread_udp is not None and self.thread_udp.is_alive():
             self.thread_udp.join() # 子线程停止
-        self.m_udpSocket.close() # 关闭udp socket
+        if self.m_udpSocket is not None:
+            self.m_udpSocket.close() # 关闭udp socket
 
         self.runFlag_read = False
         if self.thread_read is not None and self.thread_read.is_alive():

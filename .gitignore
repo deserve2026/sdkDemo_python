@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# è™šæ‹Ÿç¯å¢ƒ
+.venv/
+venv/
+env/
+
+# æœ¬å·¥å…·ç”Ÿæˆçš„å¸§ç´¢å¼•ç¼“å­˜
+*.frameidx
+*.frameidx2
+
+# IDE
+.idea/
+.vscode/
+
+# æœ¬å·¥å…·ç”Ÿæˆçš„è¾“å‡º
+output/
+frames/
+
+# ĞĞÎª·ÖÎöÊä³ö£¨Éú³ÉÎï£©
+behavior_out/
+*_behavior/
+
+
+# ĞĞÎª»ùÏß»º´æ£¨¿ÉÖØ½¨£©
+sonar_params_baseline.json
+
+
+# Sonar raw data, model weights and generated experiment outputs
+*.DB
+*.db
+frame_*.png
+*.pth
+*.pt
+*.onnx
+*.log
+events.out.tfevents.*

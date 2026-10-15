@@ -1,0 +1,586 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ui version="4.0">
+ <class>SonarWorkbench</class>
+ <widget class="QMainWindow" name="SonarWorkbench">
+  <property name="windowTitle">
+   <string>声呐行为分析工作台 · 高体鰤</string>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1440</width>
+    <height>940</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>1100</width>
+    <height>720</height>
+   </size>
+  </property>
+  <property name="dockNestingEnabled">
+   <bool>true</bool>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="centralLayout">
+    <property name="spacing">
+     <number>10</number>
+    </property>
+    <property name="leftMargin">
+     <number>14</number>
+    </property>
+    <property name="topMargin">
+     <number>14</number>
+    </property>
+    <property name="rightMargin">
+     <number>14</number>
+    </property>
+    <property name="bottomMargin">
+     <number>14</number>
+    </property>
+    <item>
+     <layout class="QHBoxLayout" name="headerLayout">
+      <item>
+       <layout class="QVBoxLayout" name="brandLayout">
+        <item>
+         <widget class="QLabel" name="brandTitle">
+          <property name="text">
+           <string>声呐行为分析</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="brandSubtitle">
+          <property name="text">
+           <string>高体鰤  /  正常游动 · 摄食行为</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <spacer name="headerSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="openPngButton">
+        <property name="text">
+         <string>打开 PNG 序列</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="openDbButton">
+        <property name="text">
+         <string>打开 DB 文件</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QLabel" name="sourceLabel">
+      <property name="text">
+       <string>尚未加载数据 · 原始文件只读</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="imageLabel">
+      <property name="text">
+       <string>打开声呐 DB 文件或 PNG 序列，开始回放</string>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>620</width>
+        <height>320</height>
+       </size>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
+        <horstretch>1</horstretch>
+        <verstretch>1</verstretch>
+       </sizepolicy>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QFrame" name="playbackCard">
+      <layout class="QVBoxLayout" name="playbackLayout">
+       <item>
+        <widget class="QSlider" name="frameSlider">
+         <property name="maximum">
+          <number>0</number>
+         </property>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="transportLayout">
+         <item>
+          <widget class="QPushButton" name="previousButton">
+           <property name="text">
+            <string>上一帧</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="playButton">
+           <property name="text">
+            <string>播放</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="nextButton">
+           <property name="text">
+            <string>下一帧</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="resetButton">
+           <property name="text">
+            <string>回到开头</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="transportSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="speedCaption">
+           <property name="text">
+            <string>回放速度</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="speedSpin">
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>40</number>
+           </property>
+           <property name="value">
+            <number>10</number>
+           </property>
+           <property name="suffix">
+            <string> 帧/秒</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="frameLabel">
+           <property name="text">
+            <string>帧 — / —</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>文件</string>
+    </property>
+    <addaction name="actionOpenDb" />
+    <addaction name="actionOpenPng" />
+    <addaction name="actionExit" />
+   </widget>
+   <addaction name="menuFile" />
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>视图与布局</string>
+    </property>
+    <addaction name="actionResetLayout" />
+    <addaction name="actionLockLayout" />
+   </widget>
+   <addaction name="menuView" />
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>工具</string>
+    </property>
+    <addaction name="actionDesigner" />
+    <addaction name="actionLegacy" />
+    <addaction name="actionReport" />
+   </widget>
+   <addaction name="menuTools" />
+  </widget>
+  <action name="actionOpenDb">
+   <property name="text">
+    <string>打开 DB 文件…</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionOpenPng">
+   <property name="text">
+    <string>打开 PNG 序列…</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>退出</string>
+   </property>
+  </action>
+  <action name="actionResetLayout">
+   <property name="text">
+    <string>恢复默认布局</string>
+   </property>
+  </action>
+  <action name="actionLockLayout">
+   <property name="text">
+    <string>锁定面板位置</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+  </action>
+  <action name="actionDesigner">
+   <property name="text">
+    <string>在 Qt Designer 中编辑界面…</string>
+   </property>
+  </action>
+  <action name="actionLegacy">
+   <property name="text">
+    <string>原有数量 / 体长工具</string>
+   </property>
+  </action>
+  <action name="actionReport">
+   <property name="text">
+    <string>打开本轮训练报告</string>
+   </property>
+  </action>
+  <widget class="QStatusBar" name="statusbar" />
+  <widget class="QDockWidget" name="behaviorDock">
+   <property name="windowTitle">
+    <string>摄食识别</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="behaviorContent">
+    <layout class="QVBoxLayout" name="behaviorDockLayout">
+     <item>
+      <widget class="QLabel" name="behaviorState">
+       <property name="text">
+        <string>等待数据</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="phaseLabel">
+       <property name="text">
+        <string>加载数据后建立连续帧窗口</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="probabilityLabel">
+       <property name="text">
+        <string>摄食得分：—</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QProgressBar" name="probabilityBar">
+       <property name="value">
+        <number>0</number>
+       </property>
+       <property name="format">
+        <string>—</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="bufferLabel">
+       <property name="text">
+        <string>连续帧 0 / 32</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="modelLabel">
+       <property name="text">
+        <string>正在检查模型…</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="contractLabel">
+       <property name="text">
+        <string>32 帧窗口 · 每 8 帧判断一次
+进入 0.8 / 退出 0.6 · 连续两次确认
+本版不识别应激行为</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="inferenceCheck">
+       <property name="text">
+        <string>启用摄食模型</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="reloadModelButton">
+       <property name="text">
+        <string>重新加载已选模型</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="sourceCaution">
+       <property name="text">
+        <string>回放速度用于显示调度，不代表已核实的原始采集帧率。</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+   <property name="minimumSize">
+    <size>
+     <width>285</width>
+     <height>260</height>
+    </size>
+   </property>
+  </widget>
+  <widget class="QDockWidget" name="controlDock">
+   <property name="windowTitle">
+    <string>画面与辅助工具</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="controlContent">
+    <layout class="QVBoxLayout" name="controlDockLayout">
+     <item>
+      <widget class="QCheckBox" name="seriesCheck">
+       <property name="text">
+        <string>同名 DB 分段连续回放</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="flipCheck">
+       <property name="text">
+        <string>上下翻转显示（不影响模型输入）</string>
+       </property>
+       <property name="checked">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="countCheck">
+       <property name="text">
+        <string>显示阈值检测目标与数量</string>
+       </property>
+       <property name="checked">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="thresholdLayout">
+       <item>
+        <widget class="QLabel" name="thresholdCaption">
+         <property name="text">
+          <string>灰度阈值</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="thresholdSpin">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>255</number>
+         </property>
+         <property name="value">
+          <number>160</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="areaLayout">
+       <item>
+        <widget class="QLabel" name="areaCaption">
+         <property name="text">
+          <string>最小面积 / 像素</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="areaSpin">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>100000</number>
+         </property>
+         <property name="value">
+          <number>20</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QLabel" name="countLabel">
+       <property name="text">
+        <string>检测目标数：—</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="legacyButton">
+       <property name="text">
+        <string>打开原有数量 / 体长工具</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="designerButton">
+       <property name="text">
+        <string>用 Qt Designer 编辑界面</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="layoutHint">
+       <property name="text">
+        <string>拖动面板标题可调整位置；布局会自动保存。双击标题可浮动或停靠。</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="logDock">
+   <property name="windowTitle">
+    <string>状态切换与运行记录</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>8</number>
+   </attribute>
+   <widget class="QWidget" name="logContent">
+    <layout class="QVBoxLayout" name="logDockLayout">
+     <item>
+      <layout class="QHBoxLayout" name="logRow">
+       <item>
+        <widget class="QTableWidget" name="eventTable">
+         <property name="maximumHeight">
+          <number>170</number>
+         </property>
+         <property name="alternatingRowColors">
+          <bool>true</bool>
+         </property>
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+         <column>
+          <property name="text">
+           <string>帧号</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>状态切换</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>摄食得分</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPlainTextEdit" name="logText">
+         <property name="maximumHeight">
+          <number>170</number>
+         </property>
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="placeholderText">
+          <string>运行记录和输出位置将显示在这里</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+ </widget>
+ <resources />
+ <connections />
+</ui>

@@ -1,0 +1,6 @@
+{
+  "model_dirs": [
+    "F:/experimental_results/mend26s/pt_onnx"
+  ],
+  "behavior_baseline": "G:\\9_13\\第1次正常游动\\1.DB"
+}
