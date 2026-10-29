@@ -1,0 +1,3 @@
+# ONNX Runtime already exists in the separate yazhou_py311 playback environment.
+# Export uses the installed PyTorch and its explicit TorchScript ONNX exporter.
+onnx==1.19.1

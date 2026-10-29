@@ -1,0 +1,26 @@
+# Explicitly authorized baseline; this command never evaluates test.
+enabled: true
+data_review_accepted: true
+seed: 42
+device: cuda
+cpu_threads: 4
+image_workers: 4
+feature_extraction_batch_size: 16
+batch_size: 32
+num_workers: 0
+epochs: 30
+learning_rate: 0.001
+weight_decay: 0.0001
+normal_to_feeding_max_ratio: 2.0
+balance_train_only: true
+checkpoint_metric: val_event_recall_then_false_alarms_then_stability
+entry_thresholds: [0.4, 0.5, 0.6, 0.7, 0.8]
+exit_threshold_gap: 0.2
+entry_consecutive: 2
+exit_consecutive: 2
+test_for_tuning: false
+acceptance_event_recall_phase_1: 0.90
+acceptance_event_recall_phase_2: 0.95
+strict_onset_delay_gate: false
+strict_offset_delay_gate: false
+

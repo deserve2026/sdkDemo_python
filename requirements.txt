@@ -1,0 +1,13 @@
+numpy
+pandas
+opencv-python
+pillow
+pyyaml
+tqdm
+rich
+matplotlib
+scikit-learn
+pytest
+# Install torch==2.10.0 and torchvision==0.25.0 separately using README.
+# ONNX packages are intentionally deferred until the notebook experiment works.
+
